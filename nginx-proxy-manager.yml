@@ -1,0 +1,140 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nginx-proxy-manager-local-data-volume
+  labels:
+    directory: data
+spec:
+  capacity:
+    storage: 500Mi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local
+  local:
+    path: /mnt/sda/nginx-proxy-manager/data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - master-rspi4
+          - worker01-rspi4
+          - worker02-rspi4
+          - worker03-rspi4
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nginx-proxy-manager-local-data-claim
+spec:
+  storageClassName: local
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+  selector:
+    matchLabels:
+      directory: data
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nginx-proxy-manager-local-letsencrypt-volume
+  labels:
+    directory: letsencrypt
+spec:
+  capacity:
+    storage: 500Mi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local
+  local:
+    path: /mnt/sda/nginx-proxy-manager/letsencrypt
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - master-rspi4
+          - worker01-rspi4
+          - worker02-rspi4
+          - worker03-rspi4
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nginx-proxy-manager-local-letsencrypt-claim
+spec:
+  storageClassName: local
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+  selector:
+    matchLabels:
+      directory: letsencrypt
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nginx-proxy-manager
+  labels:
+    app: nginx-proxy-manager
+spec:
+  selector:
+    matchLabels:
+      app: nginx-proxy-manager
+  template:
+    metadata:
+      labels:
+        app: nginx-proxy-manager
+        name: nginx-proxy-manager
+    spec:
+      containers:
+      - name: nginx-proxy-manager
+        image: jc21/nginx-proxy-manager:latest
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: nginx-proxy-manager-local-data-volume
+          mountPath: "/data"
+        - name: nginx-proxy-manager-local-letsencrypt-volume
+          mountPath: "/letsencrypt"
+      volumes:
+      - name: nginx-proxy-manager-local-data-volume
+        persistentVolumeClaim:
+          claimName: nginx-proxy-manager-local-data-claim
+      - name: nginx-proxy-manager-local-letsencrypt-volume
+        persistentVolumeClaim:
+          claimName: nginx-proxy-manager-local-letsencrypt-claim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-proxy-manager
+spec:
+  selector:
+    app: nginx-proxy-manager
+  ports:
+  - port: 80
+    targetPort: 80
+    name: nginx-proxy-manager-home
+  - port: 443
+    targetPort: 443
+    name: nginx-proxy-manager-ssl-home
+  - port: 81
+    targetPort: 81
+    name: nginx-proxy-manager-alternative
+  externalIPs:
+  - 10.0.0.100
+  - 10.0.0.101
+  - 10.0.0.102
+  - 10.0.0.103
